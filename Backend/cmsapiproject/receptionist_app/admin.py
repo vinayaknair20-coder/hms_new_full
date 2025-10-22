@@ -1,6 +1,7 @@
 from django.contrib import admin
-from .models import Patient, Appointment, Billing
+from django.utils.safestring import mark_safe
+from .models import Patient, Appointment, Bill_Generation
 
 admin.site.register(Patient)
 admin.site.register(Appointment)
-admin.site.register(Billing)
+admin.site.register(Bill_Generation)

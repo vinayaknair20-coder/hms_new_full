@@ -3,8 +3,10 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
+from django.db import transaction
 
-from .models import Medicine, PrescriptionMedicine, MedicineStockHistory, MedicineBilling
+
+from .models import Medicine, PrescriptionMedicine, MedicineStockHistory, MedicineBilling, QuickSale, QuickSaleItem
 from .serializers import (
     MedicineSerializer, 
     PrescriptionMedicineSerializer, 
@@ -12,6 +14,7 @@ from .serializers import (
     MedicineBillingSerializer
 )
 from common.permissions import IsDoctor, IsPharmacist, IsAdmin, IsReceptionist, IsAdminOrPharmacist
+
 
 
 class MedicineViewSet(viewsets.ModelViewSet):
@@ -46,6 +49,81 @@ class MedicineViewSet(viewsets.ModelViewSet):
             'medicines': serializer.data
         })
 
+    # ========== NEW: QUICK SALE ENDPOINT ==========
+    @action(detail=False, methods=['post'], url_path='quick-sale')
+    def quick_sale(self, request):
+        """
+        Process a quick sale without prescription
+        Endpoint: POST /medicines/quick-sale/
+        Body: {
+            "customer_name": "John Doe",
+            "customer_phone": "1234567890",
+            "items": [{"medicine_id": 1, "quantity": 2}]
+        }
+        """
+        customer_name = request.data.get('customer_name')
+        customer_phone = request.data.get('customer_phone', '')
+        items = request.data.get('items', [])
+        
+        if not customer_name:
+            return Response({'error': 'Customer name is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not items:
+            return Response({'error': 'No items in cart'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            with transaction.atomic():
+                # Create QuickSale record
+                quick_sale = QuickSale.objects.create(
+                    customer_name=customer_name,
+                    customer_phone=customer_phone,
+                    total_amount=0,
+                    created_by=request.user.staff if hasattr(request.user, 'staff') else None
+                )
+                
+                total = 0
+                sale_items = []
+                
+                for item in items:
+                    medicine = Medicine.objects.get(id=item['medicine_id'])
+                    price = medicine.price_per_unit
+                    item_total = price * item['quantity']
+                    total += item_total
+                    
+                    # Create QuickSaleItem (automatically updates stock)
+                    QuickSaleItem.objects.create(
+                        quick_sale=quick_sale,
+                        medicine=medicine,
+                        quantity=item['quantity'],
+                        price=price
+                    )
+                    
+                    sale_items.append({
+                        'medicine': medicine.name,
+                        'quantity': item['quantity'],
+                        'price': float(price),
+                        'total': float(item_total)
+                    })
+                
+                # Update total
+                quick_sale.total_amount = total
+                quick_sale.save()
+                
+                return Response({
+                    'sale_id': f'QS-{quick_sale.id}',
+                    'customer_name': customer_name,
+                    'customer_phone': customer_phone,
+                    'date': quick_sale.timestamp.date().isoformat(),
+                    'items': sale_items,
+                    'total_amount': float(total)
+                }, status=status.HTTP_201_CREATED)
+        
+        except Medicine.DoesNotExist:
+            return Response({'error': 'Medicine not found'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 
 class PrescriptionMedicineViewSet(viewsets.ModelViewSet):
     """
@@ -59,6 +137,7 @@ class PrescriptionMedicineViewSet(viewsets.ModelViewSet):
     # ==== NEW: Add filtering capability ====
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['prescription', 'medicine', 'quantity']
+
 
 
 class MedicineStockHistoryViewSet(viewsets.ModelViewSet):
@@ -77,6 +156,7 @@ class MedicineStockHistoryViewSet(viewsets.ModelViewSet):
     ordering = ['-timestamp']  # Latest first by default
 
 
+
 class MedicineBillingViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing medicine billing
@@ -88,8 +168,8 @@ class MedicineBillingViewSet(viewsets.ModelViewSet):
     
     # ==== NEW: Add ordering capability ====
     filter_backends = [filters.OrderingFilter]
-    ordering_fields = ['billing_date', 'total_medicine_fee', 'patient']
-    ordering = ['-billing_date']  # Latest bills first
+    ordering_fields = ['timestamp', 'total_medicine_fee', 'patient']
+    ordering = ['-timestamp']  # Latest bills first
     
     # ==== NEW: Custom action to view pending prescriptions ====
     @action(detail=False, methods=['get'], url_path='pending-prescriptions')

@@ -77,3 +77,37 @@ class MedicineBilling(models.Model):
         else:
             super().save(*args, **kwargs)
 
+class QuickSale(models.Model):
+    """For walk-in customers buying without prescription"""
+    customer_name = models.CharField(max_length=100)
+    customer_phone = models.CharField(max_length=15, blank=True)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_by = models.ForeignKey(Staff, on_delete=models.SET_NULL, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Quick Sale {self.id} - {self.customer_name}"
+
+class QuickSaleItem(models.Model):
+    """Individual items in a quick sale"""
+    quick_sale = models.ForeignKey(QuickSale, on_delete=models.CASCADE, related_name='items')
+    medicine = models.ForeignKey(Medicine, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=8, decimal_places=2)
+    
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        # Update stock and create history
+        if self._state.adding:
+            med = self.medicine
+            if med.stock < self.quantity:
+                raise ValidationError(f'Insufficient stock for {med.name}')
+            med.stock -= self.quantity
+            med.save()
+            
+            MedicineStockHistory.objects.create(
+                medicine=med,
+                change=-self.quantity,
+                reason=f'Quick Sale #{self.quick_sale.id} - {self.quick_sale.customer_name}',
+            )
+        super().save(*args, **kwargs)
