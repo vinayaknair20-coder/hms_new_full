@@ -6,12 +6,16 @@ from admin_app.models import Staff
 
 class Medicine(models.Model):
     name = models.CharField(max_length=100)
+    generic_name = models.CharField(max_length=100, blank=True, null=True)  # NEW
+    category = models.CharField(max_length=50, blank=True, null=True)  # NEW
+    manufacturer = models.CharField(max_length=100, blank=True, null=True)  # NEW
     description = models.TextField(blank=True)
     stock = models.PositiveIntegerField(default=0)
     price_per_unit = models.DecimalField(max_digits=8, decimal_places=2)
-
+    
     def __str__(self):
         return self.name
+
 
 class PrescriptionMedicine(models.Model):
     prescription = models.ForeignKey(Prescription, on_delete=models.CASCADE)
