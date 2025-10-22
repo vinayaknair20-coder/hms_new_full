@@ -23,7 +23,7 @@ class Patient(models.Model):
     emergency_contact = models.CharField(max_length=15)
     blood_group = models.CharField(max_length=3, choices=BLOOD_GROUP_CHOICES, null=True, blank=True)
 
-    def__str__(self):
+    def __str__(self):
         return f"{self.Patient_name} - (ID: {self.id})"
 
 
