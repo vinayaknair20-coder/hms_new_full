@@ -1,22 +1,60 @@
 from django.shortcuts import render
 from rest_framework import viewsets, filters, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from django.db import transaction
 
-
+# Import models
 from .models import Medicine, PrescriptionMedicine, MedicineStockHistory, MedicineBilling, QuickSale, QuickSaleItem
+
+# Import serializers
 from .serializers import (
     MedicineSerializer, 
     PrescriptionMedicineSerializer, 
     MedicineStockHistorySerializer, 
     MedicineBillingSerializer
 )
-from common.permissions import IsDoctor, IsPharmacist, IsAdmin, IsReceptionist, IsAdminOrPharmacist
+
+# Import common permissions
+from common.permissions import IsDoctor, IsAdmin, IsReceptionist, IsAdminOrPharmacist
 
 
+# ========================
+# PHARMACIST PROFILE VIEW
+# ========================
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])  # Changed from IsPharmacist to IsAuthenticated
+def get_pharmacist_profile(request):
+    """Get pharmacist profile information"""
+    user = request.user
+    
+    # Check if user is pharmacist
+    if user.role != 'Pharmacist':
+        return Response({'error': 'Access denied. Pharmacist role required.'}, status=403)
+    
+    try:
+        staff = user.staff
+        return Response({
+            'id': user.id,
+            'username': user.username,
+            'role': user.role,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'staff_id': staff.id,
+            'phone': staff.phone,
+            'blood_group': staff.blood_group,
+            'address': staff.address
+        })
+    except Exception as e:
+        return Response({'error': 'Staff profile not found'}, status=404)
 
+
+# ========================
+# MEDICINE VIEWSET
+# ========================
 class MedicineViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing Medicine catalog
@@ -24,23 +62,20 @@ class MedicineViewSet(viewsets.ModelViewSet):
     """
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
-    permission_classes = [IsAdmin | IsPharmacist]
+    permission_classes = [IsAdmin | IsAdminOrPharmacist]
     
-    # ==== NEW: Add search and filter functionality ====
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['name', 'description']  # Search medicines by name or description
-    ordering_fields = ['name', 'stock', 'price_per_unit']  # Allow ordering by these fields
-    ordering = ['name']  # Default ordering
+    search_fields = ['name', 'description']
+    ordering_fields = ['name', 'stock', 'price_per_unit']
+    ordering = ['name']
     
-    # ==== NEW: Custom action for low stock medicines ====
     @action(detail=False, methods=['get'], url_path='low-stock')
     def low_stock(self, request):
         """
         Get medicines with stock below threshold (20 units)
         Endpoint: GET /medicines/low-stock/
-        Returns: List of medicines with stock < 20
         """
-        threshold = 20  # Low stock threshold set to 20 units
+        threshold = 20
         low_stock_medicines = Medicine.objects.filter(stock__lt=threshold).order_by('stock')
         serializer = self.get_serializer(low_stock_medicines, many=True)
         return Response({
@@ -49,17 +84,11 @@ class MedicineViewSet(viewsets.ModelViewSet):
             'medicines': serializer.data
         })
 
-    # ========== NEW: QUICK SALE ENDPOINT ==========
     @action(detail=False, methods=['post'], url_path='quick-sale')
     def quick_sale(self, request):
         """
         Process a quick sale without prescription
         Endpoint: POST /medicines/quick-sale/
-        Body: {
-            "customer_name": "John Doe",
-            "customer_phone": "1234567890",
-            "items": [{"medicine_id": 1, "quantity": 2}]
-        }
         """
         customer_name = request.data.get('customer_name')
         customer_phone = request.data.get('customer_phone', '')
@@ -73,7 +102,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
         
         try:
             with transaction.atomic():
-                # Create QuickSale record
                 quick_sale = QuickSale.objects.create(
                     customer_name=customer_name,
                     customer_phone=customer_phone,
@@ -90,7 +118,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
                     item_total = price * item['quantity']
                     total += item_total
                     
-                    # Create QuickSaleItem (automatically updates stock)
                     QuickSaleItem.objects.create(
                         quick_sale=quick_sale,
                         medicine=medicine,
@@ -105,7 +132,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
                         'total': float(item_total)
                     })
                 
-                # Update total
                 quick_sale.total_amount = total
                 quick_sale.save()
                 
@@ -124,96 +150,98 @@ class MedicineViewSet(viewsets.ModelViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-
+# ========================
+# PRESCRIPTION MEDICINE VIEWSET
+# ========================
 class PrescriptionMedicineViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing Prescription-Medicine relationships
-    Links prescriptions to specific medicines with quantities
     """
     queryset = PrescriptionMedicine.objects.all()
     serializer_class = PrescriptionMedicineSerializer
-    permission_classes = [IsAdmin | IsPharmacist]
+    permission_classes = [IsAdmin | IsAdminOrPharmacist]
     
-    # ==== NEW: Add filtering capability ====
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['prescription', 'medicine', 'quantity']
 
 
-
+# ========================
+# STOCK HISTORY VIEWSET
+# ========================
 class MedicineStockHistoryViewSet(viewsets.ModelViewSet):
     """
     ViewSet for tracking medicine stock changes
-    Maintains audit trail of all stock movements
     """
     queryset = MedicineStockHistory.objects.all()
     serializer_class = MedicineStockHistorySerializer
-    permission_classes = [IsAdmin | IsPharmacist]
+    permission_classes = [IsAdmin | IsAdminOrPharmacist]
     
-    # ==== NEW: Add search and ordering ====
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['reason', 'medicine__name']  # Search by reason or medicine name
+    search_fields = ['reason', 'medicine__name']
     ordering_fields = ['timestamp', 'medicine', 'change']
-    ordering = ['-timestamp']  # Latest first by default
+    ordering = ['-timestamp']
 
 
-
+# ========================
+# BILLING VIEWSET
+# ========================
 class MedicineBillingViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing medicine billing
-    Handles billing operations + custom actions for pharmacist workflows
     """
     queryset = MedicineBilling.objects.all()
     serializer_class = MedicineBillingSerializer
-    permission_classes = [IsAdmin | IsPharmacist]
+    permission_classes = [IsAdmin | IsAdminOrPharmacist]
     
-    # ==== NEW: Add ordering capability ====
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['timestamp', 'total_medicine_fee', 'patient']
-    ordering = ['-timestamp']  # Latest bills first
+    ordering = ['-timestamp']
     
-    # ==== NEW: Custom action to view pending prescriptions ====
     @action(detail=False, methods=['get'], url_path='pending-prescriptions')
     def pending_prescriptions(self, request):
         """
         Get all prescriptions that haven't been billed yet
         Endpoint: GET /medicinebilling/pending-prescriptions/
-        Returns: List of prescription IDs that need to be dispensed
         """
         from doctor_app.models import Prescription
         
-        # Get all prescription IDs that have been billed
         billed_prescription_ids = MedicineBilling.objects.values_list('prescription_id', flat=True)
         
-        # Get prescriptions that haven't been billed yet
         pending_prescriptions = Prescription.objects.exclude(
             id__in=billed_prescription_ids
         ).select_related('doctor', 'consultation__patient')
         
-        # Format response with prescription details
         pending_data = []
         for prescription in pending_prescriptions:
-            pending_data.append({
-                'prescription_id': prescription.id,
-                'patient_name': f"{prescription.consultation.patient.first_name} {prescription.consultation.patient.last_name}",
-                'doctor_name': f"{prescription.doctor.user.first_name} {prescription.doctor.user.last_name}",
-                'prescription_date': prescription.date_time,
-                'dosage': prescription.dosage,
-                'frequency': prescription.frequency,
-                'duration': prescription.duration,
-            })
+            try:
+                patient = prescription.consultation.patient
+                patient_name = patient.Patient_name
+                
+                doctor = prescription.doctor
+                doctor_name = doctor.user.username
+                
+                pending_data.append({
+                    'prescription_id': prescription.id,
+                    'patient_name': patient_name,
+                    'doctor_name': doctor_name,
+                    'prescription_date': prescription.date_time,
+                    'dosage': prescription.dosage,
+                    'frequency': prescription.frequency,
+                    'duration': prescription.duration,
+                })
+            except AttributeError:
+                continue
         
         return Response({
             'count': len(pending_data),
             'pending_prescriptions': pending_data
         })
     
-    # ==== NEW: Custom action to get billing summary ====
     @action(detail=False, methods=['get'], url_path='billing-summary')
     def billing_summary(self, request):
         """
         Get summary of billing statistics
         Endpoint: GET /medicinebilling/billing-summary/
-        Returns: Total bills, total revenue, average bill amount
         """
         from django.db.models import Sum, Avg, Count
         

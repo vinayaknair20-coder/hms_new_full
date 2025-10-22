@@ -6,6 +6,7 @@ from common.permissions import IsDoctor, IsPharmacist, IsAdmin, IsReceptionist
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -13,15 +14,18 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAdmin]
 
+
 class SpecializationViewSet(viewsets.ModelViewSet):
     queryset = Specialization.objects.all()
     serializer_class = SpecializationSerializer
     permission_classes = [IsAdmin]
 
+
 class StaffViewSet(viewsets.ModelViewSet):
     queryset = Staff.objects.all()
     serializer_class = StaffSerializer
     permission_classes = [IsAdmin]
+
 
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
@@ -78,3 +82,26 @@ class CreateUserWithProfiles(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         return Response({"id": user.id, "username": user.username}, status=201)
+
+
+# ========================
+# ✅ NEW FUNCTION - USER PROFILE FOR LOGIN
+# ========================
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_profile(request):
+    """
+    Get current user's profile with role
+    Used by frontend Login to determine which dashboard to route to
+    Endpoint: GET /api/users/profile/
+    """
+    user = request.user
+    
+    return Response({
+        'username': user.username,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'role': user.role,  # Critical: Returns actual role from database
+        'is_active': user.is_active,
+    })

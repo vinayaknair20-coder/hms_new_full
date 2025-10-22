@@ -1,16 +1,16 @@
 from django.contrib import admin
 from django.urls import path, include
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
-
+from rest_framework_simplejwt.views import TokenRefreshView
+from common.serializers import CustomTokenObtainPairView  # ✅ Import custom view
 
 urlpatterns = [
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),     # login (get access/refresh token)
+    path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),  # ✅ Use custom token view
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),    
     path('admin/', admin.site.urls),
-    path('api/admin/', include('admin_app.urls')),
+    
+    # ✅ CHANGE THIS LINE!
+    path('api/users/', include('admin_app.urls')),  # Changed from api/admin/ to api/users/
+    
     path('api/receptionist/', include('receptionist_app.urls')),
     path('api/doctor/', include('doctor_app.urls')),
     path('api/pharmacist/', include('pharmacist_app.urls')),
