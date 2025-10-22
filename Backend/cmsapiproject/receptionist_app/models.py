@@ -23,7 +23,7 @@ class Patient(models.Model):
     emergency_contact = models.CharField(max_length=15)
     blood_group = models.CharField(max_length=3, choices=BLOOD_GROUP_CHOICES, null=True, blank=True)
 
-    def _str_(self):
+    def__str__(self):
         return f"{self.Patient_name} - (ID: {self.id})"
 
 
@@ -39,7 +39,7 @@ class Appointment(models.Model):
     Appointment_date = models.DateField(null=True, blank=True)
     Appointment_time = models.TimeField(auto_now_add=True, null=True, blank=True)
 
-    def _str_(self):
+    def __str__(self):
         doctor_name = self.doctor.user.username if self.doctor else "No Doctor Assigned"
         return f"Appointment {self.id} - {self.Patient.Patient_name} on {self.Appointment_date}"
 
@@ -83,6 +83,6 @@ class Bill_Generation(models.Model):
 
         super().save(*args, **kwargs)
 
-    def _str_(self):
+    def __str__(self):
         patient_name = self.Patient.Patient_name if self.Patient else "Unknown"
         return f"Bill {self.id} - {patient_name} - Token: {self.Token}"
