@@ -6,7 +6,7 @@ from django.utils import timezone
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = '_all_'
+        fields = '-__all__'
 
     # Phone number validation
     def validate_phone(self, value):
@@ -39,7 +39,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Appointment
-        fields = '_all_'
+        fields = '-__all__'
 
     def validate_Appointment_date(self, value):
         # Appointment date must not be in the past
@@ -56,7 +56,7 @@ class BillGenerationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Bill_Generation
-        fields = '_all_'
+        fields = '__all__'
         read_only_fields = ('Billing_date', 'Token')
 
     def validate_Amount(self, value):
