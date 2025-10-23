@@ -44,7 +44,7 @@ class Consultation(models.Model):
     consultation_notes = models.TextField(blank=True, null=True)
 
     class Meta:
-        db_table = 'doctorconsultations'
+        db_table = 'doctor_app_consultations'
         ordering = ['-consultationdate']
 
     def __str__(self):
@@ -65,7 +65,7 @@ class Prescription(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'doctorprescriptions'
+        db_table = 'doctor_app_prescription'
         ordering = ['-prescriptiondate']
 
     def __str__(self):
@@ -81,7 +81,7 @@ class MedicinePrescription(models.Model):
     quantity = models.PositiveIntegerField()
 
     class Meta:
-        db_table = 'doctor_medicineprescriptions'
+        db_table = 'doctor_app_medicineprescriptions'
 
     def __str__(self):
         return f'Medicine {self.medicinename} for Prescription {self.prescription.prescriptionid}'
@@ -92,7 +92,7 @@ class TestPrescription(models.Model):
     instructions = models.TextField(blank=True, null=True)
 
     class Meta:
-        db_table = 'doctor_testprescriptions'
+        db_table = 'doctor_app_testprescriptions'
 
-    def __str_(self):
+    def __str__(self):
         return f'Test {self.testname} for Prescription {self.prescription.prescriptionid}'
