@@ -1,30 +1,28 @@
 from rest_framework import serializers
 from .models import Consultation, Prescription, MedicinePrescription, TestPrescription
-from admin_app.models import Staff
 from django.utils import timezone
-
 
 class MedicinePrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = MedicinePrescription
-        fields = '__all__'
+        fields = '_all_'
         extra_kwargs = {'prescription': {'required': False}}
 
 class TestPrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestPrescription
-        fields = '__all_'
+        fields = '_all_'
         extra_kwargs = {'prescription': {'required': False}}
 
 class PrescriptionSerializer(serializers.ModelSerializer):
-    patientname = serializers.CharField(source='patient.Patientname', read_only=True)
-    doctorname = serializers.CharField(source='doctor.staffname', read_only=True)
+    patientname = serializers.CharField(source='consultation.appointment.Patient.Patient_name', read_only=True)
+    doctorname = serializers.CharField(source='doctor.user.username', read_only=True)
     medicines = MedicinePrescriptionSerializer(many=True, source='medicine_prescriptions', read_only=True)
     tests = TestPrescriptionSerializer(many=True, source='test_prescriptions', read_only=True)
 
     class Meta:
         model = Prescription
-        fields = '__all__'
+        fields = '_all_'
         read_only_fields = ['prescriptionid', 'created_at']
 
 class PrescriptionCreateSerializer(serializers.ModelSerializer):
@@ -33,7 +31,7 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Prescription
-        fields = '__all__'
+        fields = '_all_'
 
     def create(self, validated_data):
         medicines_data = validated_data.pop('medicines', [])
@@ -94,37 +92,30 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
         return instance
 
 
-
-
 class ConsultationSerializer(serializers.ModelSerializer):
-    # Access patient name through appointment → patient
     patientname = serializers.SerializerMethodField()
     patientage = serializers.SerializerMethodField()
-    # Assuming doctor is a Staff object, get full name
     doctorname = serializers.SerializerMethodField()
-    appointmentid = serializers.IntegerField(source='appointment.appointmentid', read_only=True)
+    appointmentid = serializers.IntegerField(source='appointment.id', read_only=True)
 
     class Meta:
         model = Consultation
-        fields = '__all__'
-        read_only_fields = ['consultationid', 'createdat', 'updatedat']
+        fields = '_all_'
+        read_only_fields = ['consultationid']
 
     def get_patientname(self, obj):
-        if obj.appointment and obj.appointment.patient:
-            return f"{obj.appointment.patient.first_name} {obj.appointment.patient.last_name}"
+        if obj.appointment and obj.appointment.Patient:
+            return obj.appointment.Patient.Patient_name
         return "Unknown"
 
     def get_patientage(self, obj):
-        if obj.appointment and obj.appointment.patient and hasattr(obj.appointment.patient, 'dob'):
+        if obj.appointment and obj.appointment.Patient and obj.appointment.Patient.dob:
             today = timezone.now().date()
-            dob = obj.appointment.patient.dob
+            dob = obj.appointment.Patient.dob
             return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
         return None
 
     def get_doctorname(self, obj):
-        if obj.doctor:
-            # Assuming your Staff model has user with first_name & last_name
-            if hasattr(obj.doctor, 'user'):
-                return f"{obj.doctor.user.first_name} {obj.doctor.user.last_name}"
-            return str(obj.doctor)
+        if obj.doctor and hasattr(obj.doctor, 'user'):
+            return f"{obj.doctor.user.first_name} {obj.doctor.user.last_name}"
         return "Unknown"
