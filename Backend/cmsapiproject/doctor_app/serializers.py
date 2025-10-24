@@ -5,13 +5,13 @@ from django.utils import timezone
 class MedicinePrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = MedicinePrescription
-        fields = '_all_'
+        fields = '__all__'
         extra_kwargs = {'prescription': {'required': False}}
 
 class TestPrescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestPrescription
-        fields = '_all_'
+        fields = '__all__'
         extra_kwargs = {'prescription': {'required': False}}
 
 class PrescriptionSerializer(serializers.ModelSerializer):
@@ -22,7 +22,7 @@ class PrescriptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Prescription
-        fields = '_all_'
+        fields = '__all__'
         read_only_fields = ['prescriptionid', 'created_at']
 
 class PrescriptionCreateSerializer(serializers.ModelSerializer):
@@ -31,7 +31,7 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Prescription
-        fields = '_all_'
+        fields = '__all__'
 
     def create(self, validated_data):
         medicines_data = validated_data.pop('medicines', [])
@@ -100,7 +100,7 @@ class ConsultationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultation
-        fields = '_all_'
+        fields = '__all__'
         read_only_fields = ['consultationid']
 
     def get_patientname(self, obj):

@@ -47,7 +47,7 @@ class Consultation(models.Model):
         db_table = 'doctor_app_consultations'
         ordering = ['-consultationdate']
 
-    def _str_(self):
+    def __str__(self):
         patient_name = (
             self.appointment.Patient.Patient_name
             if self.appointment and self.appointment.Patient else "Unknown"
@@ -68,7 +68,7 @@ class Prescription(models.Model):
         db_table = 'doctor_app_prescription'
         ordering = ['-prescriptiondate']
 
-    def _str_(self):
+    def __str__(self):
         return f'Prescription {self.prescriptionid}'
 
 class MedicinePrescription(models.Model):
@@ -83,7 +83,7 @@ class MedicinePrescription(models.Model):
     class Meta:
         db_table = 'doctor_app_medicineprescriptions'
 
-    def _str_(self):
+    def __str__(self):
         return f'Medicine {self.medicinename} for Prescription {self.prescription.prescriptionid}'
 
 class TestPrescription(models.Model):
@@ -94,5 +94,5 @@ class TestPrescription(models.Model):
     class Meta:
         db_table = 'doctor_app_testprescriptions'
 
-    def _str_(self):
+    def __str__(self):
         return f'Test {self.testname} for Prescription {self.prescription.prescriptionid}'
